@@ -57,31 +57,41 @@ void DAT_Handler(void);
 
 /* Class Method Implementations */
 
-M0110_::M0110_(void) {
-	_clk_pin = M0110_CLK_PIN;
-	_dat_pin = M0110_DAT_PIN;
+uint16_t M0110::_dat_pin;
+uint16_t M0110::_clk_pin;
+uint8_t *M0110::_kbuf;
+unsigned int M0110::_kbuf_tail;
+unsigned int M0110::_kbuf_used;
+
+M0110::M0110(uint16_t dat_pin, uint16_t clk_pin) {
+	_dat_pin = dat_pin;
+	_clk_pin = clk_pin;
 }
 
-void M0110_::begin(void) {
-	// Set _clk_pin as output and HIGH
+void M0110::begin(void) {
+	// Allocate memory to _kbuf
+	_kbuf = (uint8_t *)malloc(M0110_BUFFER_SIZE);
+
+	// Configure pins
+	pinMode(_dat_pin, INPUT);
 	pinMode(_clk_pin, OUTPUT);
 	digitalWrite(_clk_pin, HIGH);
 
-	// Configure Timer
+	// Configure Interrupts
 	tc3_init();
-
-	// Set _dat_pin as input with interrupt
-	pinMode(_dat_pin, INPUT);
 	attachInterrupt(digitalPinToInterrupt(_dat_pin), DAT_Handler, FALLING);
 }
 
-void M0110_::end() {
+void M0110::end() {
 	tc3_disable();
 	tc3_reset();
 	detachInterrupt(digitalPinToInterrupt(_dat_pin));
+	pinMode(_dat_pin, INPUT);
+	pinMode(_clk_pin, INPUT);
+	free(_kbuf);
 }
 
-size_t M0110_::press(uint8_t k) {
+size_t M0110::press(uint8_t k) {
 	// [0x00 - 0x7F] Use ASCII array
 	if (k < 0x80) {
 		uint8_t scancode = _M0110_AsciiToScanCode[k];
@@ -118,7 +128,7 @@ size_t M0110_::press(uint8_t k) {
 	return 1;
 }
 
-size_t M0110_::release(uint8_t k) {
+size_t M0110::release(uint8_t k) {
 	// [0x00 - 0x7F] Use ASCII array
 	if (k < 0x80) {
 		uint8_t scancode = _M0110_AsciiToScanCode[k];
@@ -155,9 +165,9 @@ size_t M0110_::release(uint8_t k) {
 	return 1;
 }
 
-void M0110_::releaseAll(void) {}
+void M0110::releaseAll(void) {}
 
-size_t M0110_::write(uint8_t k) {
+size_t M0110::write(uint8_t k) {
 	// [0x00 - 0x7F] Use ASCII array
 	if (k < 0x80) {
 		uint8_t scancode = _M0110_AsciiToScanCode[k];
@@ -204,7 +214,7 @@ size_t M0110_::write(uint8_t k) {
 	return 1;
 }
 
-size_t M0110_::write(const uint8_t *buffer, size_t size) {
+size_t M0110::write(const uint8_t *buffer, size_t size) {
 	size_t n = 0;
 	while (size--) {
 		if (write(*buffer)) n++;
@@ -216,7 +226,7 @@ size_t M0110_::write(const uint8_t *buffer, size_t size) {
 
 /* State Machine */
 
-void M0110_::_sm(size_t event) {
+void M0110::_sm(size_t event) {
 	static int sm_state = RXTRIG_STATE;
 	static unsigned int clk_counter = 0;
 	static uint8_t rxbyte = 0x00;
@@ -309,18 +319,16 @@ void M0110_::_sm(size_t event) {
 	}
 }
 
-M0110_ M0110;
-
 /* Buffer Functions */
 
-void M0110_::_queueKeyCode(uint8_t keycode) {
+void M0110::_queueKeyCode(uint8_t keycode) {
 	if (_kbuf_used < M0110_BUFFER_SIZE) { // queue if not full
 		_kbuf[(_kbuf_tail + _kbuf_used) % M0110_BUFFER_SIZE] = keycode;
 		_kbuf_used++;
 	}
 }
 
-uint8_t M0110_::_dequeueKeyCode(void) {
+uint8_t M0110::_dequeueKeyCode(void) {
 	if (_kbuf_used == 0) return NULL_CODE; // if empty, return NULL_CODE
 	uint8_t keycode = _kbuf[_kbuf_tail];
 	_kbuf_used--;
@@ -404,10 +412,10 @@ void tc3_setperiod(uint32_t us) {
 /* Interrupt Handlers */
 
 void DAT_Handler() {
-	M0110._sm(DAT_EVENT);
+	M0110::_sm(DAT_EVENT);
 }
 
 void TC3_Handler() {
-	M0110._sm(TIM_EVENT);
+	M0110::_sm(TIM_EVENT);
 	TC3->COUNT16.INTFLAG.bit.MC0 = 1; // clear interrupt
 }

@@ -210,16 +210,15 @@ const uint8_t _M0110_AsciiToScanCode[128] = {
 
 /* M0110 Class */
 
-class M0110_ : public Print {
+class M0110 : public Print {
 private:
-	// Keycode buffer
-	int _clk_pin;
-	int _dat_pin;
-	uint8_t _kbuf[M0110_BUFFER_SIZE];
-	unsigned int _kbuf_tail;
-	unsigned int _kbuf_used;
+	static uint16_t _dat_pin;
+	static uint16_t _clk_pin;
+	static uint8_t *_kbuf;
+	static unsigned int _kbuf_tail;
+	static unsigned int _kbuf_used;
 public:
-	M0110_(void);
+	M0110(uint16_t dat_pin, uint16_t clk_pin);
 	void begin(void);
 	void end(void);
 	size_t write(uint8_t k);
@@ -227,10 +226,9 @@ public:
 	size_t press(uint8_t k);
 	size_t release(uint8_t k);
 	void releaseAll(void);
-	void _sm(size_t event);
-	void _queueKeyCode(uint8_t keycode);
-	uint8_t _dequeueKeyCode(void);
+	static void _sm(size_t event);
+	static void _queueKeyCode(uint8_t keycode);
+	static uint8_t _dequeueKeyCode(void);
 };
-extern M0110_ M0110;
 
 #endif // M0110_H
