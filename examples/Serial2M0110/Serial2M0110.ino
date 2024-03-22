@@ -1,6 +1,16 @@
 /**
- * SerialCtrl.ino
+ * Serial2M0110.ino
  * Author: Riley Mann
+ * 
+ * Characters sent to the SAMD21 via a serial console will be typed out on a
+ * connected Macintosh via the M0110 keyboard protocol.
+ * 
+ * Mac 128k/512k/Plus Keyboard Pinout (Socket on Computer)
+ * .---------.
+ * | 1 2 3 4 | 1 GND
+ * |         | 2 Clock
+ * |         | 3 Data
+ * '---___---' 4 5V
  * 
  * Created on 4 Mar. 2024
  */
@@ -12,15 +22,23 @@
 #define OPTION_BTN 10
 #define COMMAND_BTN 9
 
+// Initialize M0110 interface
 M0110 m0110(DAT_PIN, CLK_PIN);
 
+// Modifier button state yrackers
 int option_btn_state = HIGH;
 int command_btn_state = HIGH;
 
 void setup() {
+	// Initialize Serial
+	Serial.begin(115200);
+	while (!Serial);
+	Serial.println("Serial to M0110");
+
 	pinMode(OPTION_BTN, INPUT_PULLUP);
 	pinMode(COMMAND_BTN, INPUT_PULLUP);
-	Serial.begin(115200);
+
+	// Initialize M0110
 	m0110.begin();
 }
 
@@ -53,6 +71,7 @@ uint8_t readArrowKeys(uint8_t k) {
 }
 
 void loop() {
+	// Handle Serial Input
 	if (Serial.available() > 0) {
 		uint8_t k = Serial.read();
 		k = readArrowKeys(k);
@@ -65,8 +84,11 @@ void loop() {
 			default:
 				m0110.write(k);
 		}
+		Serial.print("KEYCODE: ");
 		Serial.println(k, HEX);
 	}
+
+	// Handle Modifier Buttons
 	if (option_btn_state == HIGH && digitalRead(OPTION_BTN) == LOW) {
 		m0110.press(M0110_OPTION);
 		Serial.println("OPTION DOWN");
@@ -85,5 +107,6 @@ void loop() {
 	}
 	option_btn_state = digitalRead(OPTION_BTN);
 	command_btn_state = digitalRead(COMMAND_BTN);
+
 	delay(10);
 }
