@@ -42,6 +42,9 @@
 #define TXBLOC_STATE 3
 #define TXWRIT_STATE 4
 
+/* Timer Config */
+#define TIM3_PRESCALER 16
+
 /* Timer Function Declarations */
 
 void tc3_init(void);
@@ -69,7 +72,7 @@ M0110::M0110(uint16_t dat_pin, uint16_t clk_pin) {
 }
 
 void M0110::begin(void) {
-	// Allocate memory to _kbuf
+	// Allocate memory to buffer
 	_kbuf = (uint8_t *)malloc(M0110_BUFFER_SIZE);
 
 	// Configure pins
@@ -83,100 +86,100 @@ void M0110::begin(void) {
 }
 
 void M0110::end() {
+	// Disable Interrupts
 	tc3_disable();
 	tc3_reset();
 	detachInterrupt(digitalPinToInterrupt(_dat_pin));
+
+	// Release pins
 	pinMode(_dat_pin, INPUT);
 	pinMode(_clk_pin, INPUT);
+
+	// free buffer
 	free(_kbuf);
 }
 
 size_t M0110::press(uint8_t k) {
-	// [0x00 - 0x7F] Use ASCII array
-	if (k < 0x80) {
-		uint8_t scancode = _M0110_AsciiToScanCode[k];
-		if (scancode == NULL_CODE) return 1; // null code
+	// Get Scan Code
+	if (k > 0x99) return 1; // invalid character
+	uint8_t scancode = _M0110_AsciiToScanCode[k];
+	if (scancode == NULL_CODE) return 1; // null code
+
+	// [0x00 - 0x83] Normal Key
+	if (k < 0x84) {
 		if (scancode & _SCSHIFT) {
 			if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
-			_queueKeyCode(((M0110_SHIFT - 0x49) << 1) | 0x01);
+			_queueKeyCode(((_M0110_AsciiToScanCode[M0110_SHIFT] & 0x7F) << 1) | 0x01);
 		} else {
 			if (_kbuf_used == M0110_BUFFER_SIZE) return 0; // no room
 		}
-		_queueKeyCode(((scancode & 0x7F) << 1) | 0x01);
 	}
 
-	// [0x80 - 0x83] Modifier Keys
-	else if (k < 0x84) {
-		if (_kbuf_used == M0110_BUFFER_SIZE) return 0; // no room
-		_queueKeyCode(((k - 0x49) << 1) | 0x01);
-	}
-
-	// [0x84 - 0x9F] Key Pad Keys
-	else if (k < 0xA0) {
+	// [0x84 - 0x95] Key Pad Key
+	else if (k < 0x96) {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x83) << 1) | 0x01);
 	}
 
-	// [0xA0 - 0xAB] Key Pad Exended Keys
-	else if (k < 0xAC) {
+	// [0x96 - 0x99] Key Pad Extended Key
+	else {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 3) return 0; // no room
 		_queueKeyCode(KEYPAD_EXT_KEYDOWN);
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x9E) << 1) | 0x01);
 	}
+
+	// Queue Scan Code
+	_queueKeyCode(((scancode & 0x7F) << 1) | 0x01);
 	return 1;
 }
 
 size_t M0110::release(uint8_t k) {
-	// [0x00 - 0x7F] Use ASCII array
-	if (k < 0x80) {
-		uint8_t scancode = _M0110_AsciiToScanCode[k];
-		if (scancode == NULL_CODE) return 1; // null code
+	// Get Scan Code
+	if (k > 0x99) return 1; // invalid character
+	uint8_t scancode = _M0110_AsciiToScanCode[k];
+	if (scancode == NULL_CODE) return 1; // null code
+
+	// [0x00 - 0x83] Normal Key
+	if (k < 0x84) {
 		if (scancode & _SCSHIFT) {
 			if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
-			_queueKeyCode(((M0110_SHIFT - 0x49) << 1) | 0x81);
+			_queueKeyCode(((_M0110_AsciiToScanCode[M0110_SHIFT] & 0x7F) << 1) | 0x81);
 		} else {
 			if (_kbuf_used == M0110_BUFFER_SIZE) return 0; // no room
 		}
-		_queueKeyCode(((scancode & 0x7F) << 1) | 0x81);
 	}
 
-	// [0x80 - 0x83] Modifier Keys
-	else if (k < 0x84) {
-		if (_kbuf_used == M0110_BUFFER_SIZE) return 0; // no room
-		_queueKeyCode(((k - 0x49) << 1) | 0x81);
-	}
-
-	// [0x84 - 0x9F] Key Pad Keys
-	else if (k < 0xA0) {
+	// [0x84 - 0x95] Key Pad Key
+	else if (k < 0x96) {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x83) << 1) | 0x81);
 	}
 
-	// [0xA0 - 0xAB] Key Pad Exended Keys
-	else if (k < 0xAC) {
+	// [0x96 - 0x99] Key Pad Extended Key
+	else {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 3) return 0; // no room
 		_queueKeyCode(KEYPAD_EXT_KEYUP);
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x9E) << 1) | 0x81);
 	}
+
+	// Queue Scan Code
+	_queueKeyCode(((scancode & 0x7F) << 1) | 0x81);
 	return 1;
 }
 
-void M0110::releaseAll(void) {}
-
 size_t M0110::write(uint8_t k) {
-	// [0x00 - 0x7F] Use ASCII array
-	if (k < 0x80) {
-		uint8_t scancode = _M0110_AsciiToScanCode[k];
-		if (scancode == NULL_CODE) return 1; // null code
+	// Get Scan Code
+	if (k > 0x99) return 1; // invalid character
+	uint8_t scancode = _M0110_AsciiToScanCode[k];
+	if (scancode == NULL_CODE) return 1; // null code
+
+	// [0x00 - 0x83] Normal Key
+	if (k < 0x84) {
 		if (scancode & _SCSHIFT) {
 			if (M0110_BUFFER_SIZE - _kbuf_used < 4) return 0; // no room
-			_queueKeyCode(((M0110_SHIFT - 0x49) << 1) | 0x01);
+			_queueKeyCode(((_M0110_AsciiToScanCode[M0110_SHIFT] & 0x7F) << 1) | 0x01);
 			_queueKeyCode(((scancode & 0x7F) << 1) | 0x01);
-			_queueKeyCode(((M0110_SHIFT - 0x49) << 1) | 0x81);
+			_queueKeyCode(((_M0110_AsciiToScanCode[M0110_SHIFT] & 0x7F) << 1) | 0x81);
 			_queueKeyCode(((scancode & 0x7F) << 1) | 0x81);
 		} else {
 			if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
@@ -185,31 +188,24 @@ size_t M0110::write(uint8_t k) {
 		}
 	}
 
-	// [0x80 - 0x83] Modifier Keys
-	else if (k < 0x84) {
-		if (M0110_BUFFER_SIZE - _kbuf_used < 2) return 0; // no room
-		_queueKeyCode(((k - 0x49) << 1) | 0x01);
-		_queueKeyCode(((k - 0x49) << 1) | 0x81);
-	}
-
-	// [0x84 - 0x9F] Key Pad Keys
-	else if (k < 0xA0) {
+	// [0x84 - 0x95] Key Pad Key
+	else if (k < 0x96) {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 4) return 0; // no room
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x83) << 1) | 0x01);
+		_queueKeyCode(((scancode & 0x7F) << 1) | 0x01);
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x83) << 1) | 0x81);
+		_queueKeyCode(((scancode & 0x7F) << 1) | 0x81);
 	}
 
-	// [0xA0 - 0xAB] Key Pad Exended Keys
-	else if (k < 0xAC) {
+	// [0x96 - 0x99] Key Pad Extended Key
+	else {
 		if (M0110_BUFFER_SIZE - _kbuf_used < 6) return 0; // no room
 		_queueKeyCode(KEYPAD_EXT_KEYDOWN);
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x9E) << 1) | 0x01);
+		_queueKeyCode(((scancode & 0x7F) << 1) | 0x01);
 		_queueKeyCode(KEYPAD_EXT_KEYUP);
 		_queueKeyCode(KEYPAD);
-		_queueKeyCode(((k - 0x9E) << 1) | 0x81);
+		_queueKeyCode(((scancode & 0x7F) << 1) | 0x81);
 	}
 	return 1;
 }

@@ -14,62 +14,54 @@
 
 #include <Arduino.h>
 
-/* Pin Configuration */
-
-#define M0110_CLK_PIN 0
-#define M0110_DAT_PIN 1
-
 #define M0110_BUFFER_SIZE 100
-
 #define NULL_CODE  0x7B
-
-/* Timer Config */
-
-#define TIM3_PRESCALER 16
 
 /* Keys */
 
-#define M0110_RETURN    0x0D // 0x24
-#define M0110_TAB       0x09 // 0x30
-#define M0110_SPACE     0x20 // 0x31
-#define M0110_BACKSPACE 0x08 // 0x33
-#define M0110_ENTER     0x0A // 0x34
+#define M0110_RETURN    0x0D
+#define M0110_TAB       0x09
+#define M0110_SPACE     0x20
+#define M0110_BACKSPACE 0x08
+#define M0110_ENTER     0x0A
 
-#define M0110_COMMAND   0x80 // 0x37
-#define M0110_SHIFT     0x81 // 0x38
-#define M0110_CAPS_LOCK 0x82 // 0x39
-#define M0110_OPTION    0x83 // 0x3A
+// Extended ASCII
 
-#define M0110_RIGHT_ARROW 0x85 // 0x42
-#define M0110_LEFT_ARROW  0x89 // 0x46
-#define M0110_DOWN_ARROW  0x8B // 0x48
-#define M0110_UP_ARROW    0x90 // 0x4D
-
-#define M0110_KP_DOT   0x84 // 0x41
-#define M0110_KP_CLEAR 0x8A // 0x47
-#define M0110_KP_ENTER 0x8F // 0x4C
-#define M0110_KP_MINUS 0x91 // 0x4E
-#define M0110_KP_0 0x95 // 0x52
-#define M0110_KP_1 0x96 // 0x53
-#define M0110_KP_2 0x97 // 0x54
-#define M0110_KP_3 0x98 // 0x55
-#define M0110_KP_4 0x99 // 0x56
-#define M0110_KP_5 0x9A // 0x57
-#define M0110_KP_6 0x9B // 0x58
-#define M0110_KP_7 0x9C // 0x59
-#define M0110_KP_8 0x9E // 0x5B
-#define M0110_KP_9 0x9F // 0x5C
-
-#define M0110_KP_ASTERISK 0xA0 // 0x62
-#define M0110_KP_PLUS     0xA4 // 0x66
-#define M0110_KP_EQUALS   0xA6 // 0x68
-#define M0110_KP_SLASH    0xAB // 0x6D
+// Modifier Keys
+#define M0110_COMMAND     0x80
+#define M0110_SHIFT       0x81
+#define M0110_CAPS_LOCK   0x82
+#define M0110_OPTION      0x83
+// Key Pad Keys
+#define M0110_RIGHT_ARROW 0x84
+#define M0110_LEFT_ARROW  0x85
+#define M0110_DOWN_ARROW  0x86
+#define M0110_UP_ARROW    0x87
+#define M0110_KP_DOT      0x88
+#define M0110_KP_CLEAR    0x89
+#define M0110_KP_ENTER    0x8A
+#define M0110_KP_MINUS    0x8B
+#define M0110_KP_0        0x8C
+#define M0110_KP_1        0x8D
+#define M0110_KP_2        0x8E
+#define M0110_KP_3        0x8F
+#define M0110_KP_4        0x90
+#define M0110_KP_5        0x91
+#define M0110_KP_6        0x92
+#define M0110_KP_7        0x93
+#define M0110_KP_8        0x94
+#define M0110_KP_9        0x95
+// Key Pad Extended Keys
+#define M0110_KP_ASTERISK 0x96
+#define M0110_KP_PLUS     0x97
+#define M0110_KP_EQUALS   0x98
+#define M0110_KP_SLASH    0x99
 
 /* ASCII to Scan Code Table */
 
 #define _SCSHIFT 0x80
 
-const uint8_t _M0110_AsciiToScanCode[128] = {
+const uint8_t _M0110_AsciiToScanCode[154] = {
 	// 0x00
 	NULL_CODE, // NUL
 	NULL_CODE, // SOH
@@ -205,7 +197,35 @@ const uint8_t _M0110_AsciiToScanCode[128] = {
 	0x2A | _SCSHIFT, // |
 	0x1E | _SCSHIFT, // }
 	0x32 | _SCSHIFT, // ~
-	NULL_CODE       // DEL
+	NULL_CODE,       // DEL
+	// 0x80
+	0x37, // COMMAND
+	0x38, // SHIFT
+	0x39, // CAPS LOCK
+	0x3A, // OPTION
+	0x02, // RIGHT ARROW
+	0x06, // LEFT ARROW
+	0x08, // DOWN ARROW
+	0x0D, // UP ARROW
+	0x01, // KP DOT
+	0x07, // KP CLEAR
+	0x0C, // KP ENTER
+	0x0E, // KP MINUS
+	0x12, // KP 0
+	0x13, // KP 1
+	0x14, // KP 2
+	0x15, // KP 3
+	// 0x90
+	0x16, // KP 4
+	0x17, // KP 5
+	0x18, // KP 6
+	0x19, // KP 7
+	0x1B, // KP 8
+	0x1C, // KP 9
+	0x02, // KP ASTERISK
+	0x06, // KP PLUS
+	0x08, // KP EQUALS
+	0x0D // KP SLASH
 };
 
 /* M0110 Class */
@@ -225,7 +245,6 @@ public:
 	size_t write(const uint8_t *buffer, size_t size);
 	size_t press(uint8_t k);
 	size_t release(uint8_t k);
-	void releaseAll(void);
 	static void _sm(size_t event);
 	static void _queueKeyCode(uint8_t keycode);
 	static uint8_t _dequeueKeyCode(void);
