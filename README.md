@@ -1,6 +1,8 @@
 # M0110 Arduino Library for SAMD processors
 
-Library implementing the Apple M0110(A) keyboard protocol to send keystrokes to a Macintosh 128K, Macintosh 512K, or Macintosh Plus.
+Library implementing the Apple M0110(A) keyboard protocol to send keystrokes to a Macintosh 128K, Macintosh 512K, or Macintosh Plus. The TMK Keyboard Wiki has a super useful page for understanding the M0110 protocol.
+
+[TMK Keyboard - Apple M0110 Keyboard Protocol](https://github.com/tmk/tmk_keyboard/wiki/Apple-M0110-Keyboard-Protocol)
 
 ## Usage
 
